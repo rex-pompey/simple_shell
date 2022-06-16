@@ -1,161 +1,233 @@
-#ifndef SHELL
-#define SHELL
+#ifndef _shell_
+#define _shell_
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
-#include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
-#include <ctype.h>
-#include <errno.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <limits.h>
 
-#define HSTRYLIMIT 4096
-#define BUFRSIZE 1024
-#define UNUSED(x) (void)(x)
+#define BUFSIZE 1024
+#define TOK_BUFSIZE 128
+#define TOK_DELIM " \t\r\n\a"
 
-#define RESET "\033[0m"
-#define BLK "\033[30m"
-#define RED "\033[31m"
-#define GRN "\033[32m"
-#define YLW "\033[33m"
-#define BLU "\033[34m"
-#define MAG "\033[35m"
-#define CYN "\033[36m"
-#define WHI "\033[37m"
-#define BBLK "\033[1m\033[30m"
-#define BRED "\033[1m\033[31m"
-#define BGRN "\033[1m\033[32m"
-#define BYLW "\033[1m\033[33m"
-#define BBLU "\033[1m\033[34m"
-#define BMAG "\033[1m\033[35m"
-#define BCYN "\033[1m\033[36m"
-#define BWHI "\033[1m\033[37m"
+/* Points to an array of pointers to strings called the "environment" */
+extern char **environ;
 
 
 /**
-* struct in_built - define a struct for builtins
-* @s: pointer to commands
-* @func: pointer to command function
-**/
-typedef struct in_built
+ * struct data - struct that contains all relevant data on runtime
+ * @av: argument vector
+ * @input: command line written by the user
+ * @args: tokens of the command line
+ * @status: last status of the shell
+ * @counter: lines counter
+ * @_environ: environment variable
+ * @pid: process ID of the shell
+ */
+typedef struct data
 {
-	char *s;
-	void (*func) (char **);
-} in_built;
-
+	char **av;
+	char *input;
+	char **args;
+	int status;
+	int counter;
+	char **_environ;
+	char *pid;
+} data_shell;
 
 /**
-* struct alias - define a struct for saving alias in a linkedlist
-* @key: alias name
-* @value: alias value
-* @next: pointer to next alias
-**/
-typedef struct alias
+ * struct sep_list_s - single linked list
+ * @separator: ; | &
+ * @next: next node
+ * Description: single linked list to store separators
+ */
+typedef struct sep_list_s
 {
-	char *key;
-	char *value;
-	struct alias *next;
-} alias;
+	char separator;
+	struct sep_list_s *next;
+} sep_list;
 
 /**
-* struct hstory - define a struct for saving history in a linkedlist
-* @input: user input
-* @next: pointer to next history node
-**/
-typedef struct hstory
+ * struct line_list_s - single linked list
+ * @line: command line
+ * @next: next node
+ * Description: single linked list to store command lines
+ */
+typedef struct line_list_s
 {
-        char *input;
-        struct hstory *next;
-} hstory;
+	char *line;
+	struct line_list_s *next;
+} line_list;
 
 /**
-* struct help_struct - define a struct for commands help page
-* @cmd: builtin command
-* @synopsis: description of command
-* @func: pointer to command functions
-**/
-typedef struct help_struct
+ * struct r_var_list - single linked list
+ * @len_var: length of the variable
+ * @val: value of the variable
+ * @len_val: length of the value
+ * @next: next node
+ * Description: single linked list to store variables
+ */
+typedef struct r_var_list
 {
-	char *cmd;
-	char *synopsis;
-	void (*func) ();
-} help_struct;
-
+	int len_var;
+	char *val;
+	int len_val;
+	struct r_var_list *next;
+} r_var;
 
 /**
-* struct save_mem - define a struct for saving refernces to allocated memory
-* @loc: address of memory area
-* @next: pointer to next memory area
-**/
-typedef struct save_mem
+ * struct builtin_s - Builtin struct for command args.
+ * @name: The name of the command builtin i.e cd, exit, env
+ * @f: data type pointer function.
+ */
+typedef struct builtin_s
 {
-	void *loc;
-	struct save_mem *next;
-} save_mem;
+	char *name;
+	int (*f)(data_shell *datash);
+} builtin_t;
 
-hstory **getHistoryHead(void);
-alias **getAliasHead(void);
-ssize_t _getline(char **lineptr, int fd);
-char *linep_withoutspaces(char *line);
-char **tokenize(char *lineptr, char dlimtr);
-char **parse_path(char *path, char dlimtr);
-int find_builtins(char **tokens);
-void check_path(char **tokens, char *p);
-void excute(char **tokens);
-void promptUser(void);
+/* aux_lists.c */
+sep_list *add_sep_node_end(sep_list **head, char sep);
+void free_sep_list(sep_list **head);
+line_list *add_line_node_end(line_list **head, char *line);
+void free_line_list(line_list **head);
 
-int _strlen(char *str);
-char *_strcpy(char *strng, int i);
+/* aux_lists2.c */
+r_var *add_rvar_node(r_var **head, int lvar, char *var, int lval);
+void free_rvar_list(r_var **head);
+
+/* aux_str functions */
+char *_strcat(char *dest, const char *src);
+char *_strcpy(char *dest, char *src);
 int _strcmp(char *s1, char *s2);
-char *_strcat2(char *s1, char *s2);
-char *_strcat(char *str1, char *str2, char formatter);
-void _puts(char *buffer);
-void _putchar(char c);
-void _puts_num(int n);
-int _atoi(char *s);
-char **deepDupe(char **args);
+char *_strchr(char *s, char c);
+int _strspn(char *s, char *accept);
 
+/* aux_mem.c */
+void _memcpy(void *newptr, const void *ptr, unsigned int size);
 void *_realloc(void *ptr, unsigned int old_size, unsigned int new_size);
-int add_mem(void **p, save_mem **head);
-int remove_child_mem(void **p, save_mem **head);
-int remove_mem(void **p, save_mem **head);
-int _ref_mem(void *p, char *action);
-void *_malloc(unsigned int size);
-void _free(void *ptr);
+char **_reallocdp(char **ptr, unsigned int old_size, unsigned int new_size);
 
-void alias_data(void);
-void cd_data(void);
-void env_data(char *cmd);
-void exit_data(void);
-void help_data(void);
-void history_data(void);
-void setenv_data(void);
-void unsetenv_data(void);
+/* aux_str2.c */
+char *_strdup(const char *s);
+int _strlen(const char *s);
+int cmp_chars(char str[], const char *delim);
+char *_strtok(char str[], const char *delim);
+int _isdigit(const char *s);
 
-void whichAlias(char **tokens);
-alias *resetAlias(alias **head, char *key, char *value);
-alias *addAlias(alias **head, char *key, char *value);
-void printAlias(alias **head);
-alias *findAlias(alias **head, char *key);
-alias *find_aliasToalias(alias **head, char *key);
+/* aux_str3.c */
+void rev_string(char *s);
 
-void chng_dr(char **str);
-void ext(char **str);
-void hlp(char **str);
+/* check_syntax_error.c */
+int repeated_char(char *input, int i);
+int error_sep_op(char *input, int i, char last);
+int first_char(char *input, int *i);
+void print_syntax_error(data_shell *datash, char *input, int i, int bool);
+int check_syntax_error(data_shell *datash, char *input);
 
-int checkEnv(char *name);
-char *_getenv(char *name);
-void _setenv(char **str);
-void _unsetenv(char **str);
-void printEnv(char **str);
+/* shell_loop.c */
+char *without_comment(char *in);
+void shell_loop(data_shell *datash);
 
-hstory *addHistory(hstory **head, char *input, int *nodeCount);
-hstory *popHead(hstory **head, int *nodeCount);
-int readFromFile(char *file, hstory **head, int *nodeCount);
-int writeHstorytofile(char *file);
-void printHistory(char **str);
+/* read_line.c */
+char *read_line(int *i_eof);
+
+/* split.c */
+char *swap_char(char *input, int bool);
+void add_nodes(sep_list **head_s, line_list **head_l, char *input);
+void go_next(sep_list **list_s, line_list **list_l, data_shell *datash);
+int split_commands(data_shell *datash, char *input);
+char **split_line(char *input);
+
+/* rep_var.c */
+void check_env(r_var **h, char *in, data_shell *data);
+int check_vars(r_var **h, char *in, char *st, data_shell *data);
+char *replaced_input(r_var **head, char *input, char *new_input, int nlen);
+char *rep_var(char *input, data_shell *datash);
+
+/* get_line.c */
+void bring_line(char **lineptr, size_t *n, char *buffer, size_t j);
+ssize_t get_line(char **lineptr, size_t *n, FILE *stream);
+
+/* exec_line */
+int exec_line(data_shell *datash);
+
+/* cmd_exec.c */
+int is_cdir(char *path, int *i);
+char *_which(char *cmd, char **_environ);
+int is_executable(data_shell *datash);
+int check_error_cmd(char *dir, data_shell *datash);
+int cmd_exec(data_shell *datash);
+
+/* env1.c */
+char *_getenv(const char *name, char **_environ);
+int _env(data_shell *datash);
+
+/* env2.c */
+char *copy_info(char *name, char *value);
+void set_env(char *name, char *value, data_shell *datash);
+int _setenv(data_shell *datash);
+int _unsetenv(data_shell *datash);
+
+/* cd.c */
+void cd_dot(data_shell *datash);
+void cd_to(data_shell *datash);
+void cd_previous(data_shell *datash);
+void cd_to_home(data_shell *datash);
+
+/* cd_shell.c */
+int cd_shell(data_shell *datash);
+
+/* get_builtin */
+int (*get_builtin(char *cmd))(data_shell *datash);
+
+/* _exit.c */
+int exit_shell(data_shell *datash);
+
+/* aux_stdlib.c */
+int get_len(int n);
+char *aux_itoa(int n);
+int _atoi(char *s);
+
+/* aux_error1.c */
+char *strcat_cd(data_shell *, char *, char *, char *);
+char *error_get_cd(data_shell *datash);
+char *error_not_found(data_shell *datash);
+char *error_exit_shell(data_shell *datash);
+
+/* aux_error2.c */
+char *error_get_alias(char **args);
+char *error_env(data_shell *datash);
+char *error_syntax(char **args);
+char *error_permission(char **args);
+char *error_path_126(data_shell *datash);
+
+
+/* get_error.c */
+int get_error(data_shell *datash, int eval);
+
+/* get_sigint.c */
+void get_sigint(int sig);
+
+/* aux_help.c */
+void aux_help_env(void);
+void aux_help_setenv(void);
+void aux_help_unsetenv(void);
+void aux_help_general(void);
+void aux_help_exit(void);
+
+/* aux_help2.c */
+void aux_help(void);
+void aux_help_alias(void);
+void aux_help_cd(void);
+
+/* get_help.c */
+int get_help(data_shell *datash);
 
 #endif
