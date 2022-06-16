@@ -1,138 +1,161 @@
-#ifndef SHELL_H
-#define SHELL_H
+#ifndef SHELL
+#define SHELL
 
-#include <fcntl.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/types.h>
+#include <ctype.h>
 #include <errno.h>
-#include <stdio.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define END_OF_FILE -2
-#define EXIT -3
+#define HSTRYLIMIT 4096
+#define BUFRSIZE 1024
+#define UNUSED(x) (void)(x)
 
-/* Global Environemnt */
-extern char **environ;
+#define RESET "\033[0m"
+#define BLK "\033[30m"
+#define RED "\033[31m"
+#define GRN "\033[32m"
+#define YLW "\033[33m"
+#define BLU "\033[34m"
+#define MAG "\033[35m"
+#define CYN "\033[36m"
+#define WHI "\033[37m"
+#define BBLK "\033[1m\033[30m"
+#define BRED "\033[1m\033[31m"
+#define BGRN "\033[1m\033[32m"
+#define BYLW "\033[1m\033[33m"
+#define BBLU "\033[1m\033[34m"
+#define BMAG "\033[1m\033[35m"
+#define BCYN "\033[1m\033[36m"
+#define BWHI "\033[1m\033[37m"
 
-/* Global Program Name */
-char *name;
-
-/* Global History Counter */
-int hist;
-
-/**
- * struct lists_s - A new struct type defining a linked list.
- * @dir: A directory path.
- * @next: A pointer to another struct list_s.
- */
-typedef struct lists_s
-{
-	char *dir;
-	struct lists_s *next;
-} lists_t;
-
-/**
- * struct builtins_s - A new struct type defining builtin commands.
- * @name: The name of the builtin command.
- * @f: A function pointer to the builtin command's function.
- */
-typedef struct builtins_s
-{
-	char *name;
-	int (*f)(char **argv, char **front);
-} builtins_t;
 
 /**
- * struct alias_s - A new struct defining aliases.
- * @name: The name of the alias.
- * @value: The value of the alias.
- * @next: A pointer to another struct alias_s.
- */
-typedef struct aliases_s
+* struct in_built - define a struct for builtins
+* @s: pointer to commands
+* @func: pointer to command function
+**/
+typedef struct in_built
 {
-	char *name;
+	char *s;
+	void (*func) (char **);
+} in_built;
+
+
+/**
+* struct alias - define a struct for saving alias in a linkedlist
+* @key: alias name
+* @value: alias value
+* @next: pointer to next alias
+**/
+typedef struct alias
+{
+	char *key;
 	char *value;
-	struct aliases_s *next;
-} aliases_t;
+	struct alias *next;
+} alias;
 
-/* Global aliases linked list */
-aliases_t *aliases;
+/**
+* struct hstory - define a struct for saving history in a linkedlist
+* @input: user input
+* @next: pointer to next history node
+**/
+typedef struct hstory
+{
+        char *input;
+        struct hstory *next;
+} hstory;
 
-/* Main Helpers */
-ssize_t _getline(char **lineptr, size_t *n, FILE *stream);
-void *_realloc(void *ptr, unsigned int old_size, unsigned int new_size);
-char **_strtok(char *line, char *delim);
-char *get_location(char *command);
-lists_t *get_path_dir(char *path);
-int execute(char **args, char **front);
-void free_list(lists_t *head);
-char *_itoa(int num);
+/**
+* struct help_struct - define a struct for commands help page
+* @cmd: builtin command
+* @synopsis: description of command
+* @func: pointer to command functions
+**/
+typedef struct help_struct
+{
+	char *cmd;
+	char *synopsis;
+	void (*func) ();
+} help_struct;
 
-/* Input Helpers */
-void handleline(char **line, ssize_t read);
-void variable_replacer(char **args, int *exe_ret);
-char *get_args(char *line, int *exe_ret);
-int call_args(char **args, char **front, int *exe_ret);
-int run_args(char **args, char **front, int *exe_ret);
-int handle_args(int *exe_ret);
-int check_args(char **args);
-void free_args(char **args, char **front);
-char **replace_alias(char **args);
 
-/* String functions */
-int _strlen(const char *s);
-char *_strcat(char *dest, const char *src);
-char *_strncat(char *dest, const char *src, size_t n);
-char *_strcpy(char *dest, const char *src);
-char *_strchr(char *s, char c);
-int _strspn(char *s, char *accept);
+/**
+* struct save_mem - define a struct for saving refernces to allocated memory
+* @loc: address of memory area
+* @next: pointer to next memory area
+**/
+typedef struct save_mem
+{
+	void *loc;
+	struct save_mem *next;
+} save_mem;
+
+hstory **getHistoryHead(void);
+alias **getAliasHead(void);
+ssize_t _getline(char **lineptr, int fd);
+char *linep_withoutspaces(char *line);
+char **tokenize(char *lineptr, char dlimtr);
+char **parse_path(char *path, char dlimtr);
+int find_builtins(char **tokens);
+void check_path(char **tokens, char *p);
+void excute(char **tokens);
+void promptUser(void);
+
+int _strlen(char *str);
+char *_strcpy(char *strng, int i);
 int _strcmp(char *s1, char *s2);
-int _strncmp(const char *s1, const char *s2, size_t n);
+char *_strcat2(char *s1, char *s2);
+char *_strcat(char *str1, char *str2, char formatter);
+void _puts(char *buffer);
+void _putchar(char c);
+void _puts_num(int n);
+int _atoi(char *s);
+char **deepDupe(char **args);
 
-/* Builtins */
-int (*get_builtin(char *command))(char **args, char **front);
-int shellie_exit(char **args, char **front);
-int shellie_env(char **args, char __attribute__((__unused__)) **front);
-int shellie_setenv(char **args, char __attribute__((__unused__)) **front);
-int shellie_unsetenv(char **args, char __attribute__((__unused__)) **front);
-int shellie_cd(char **args, char __attribute__((__unused__)) **front);
-int shellie_alias(char **args, char __attribute__((__unused__)) **front);
-int shellie_help(char **args, char __attribute__((__unused__)) **front);
+void *_realloc(void *ptr, unsigned int old_size, unsigned int new_size);
+int add_mem(void **p, save_mem **head);
+int remove_child_mem(void **p, save_mem **head);
+int remove_mem(void **p, save_mem **head);
+int _ref_mem(void *p, char *action);
+void *_malloc(unsigned int size);
+void _free(void *ptr);
 
-/* Builtin Helpers */
-char **_copy_env(void);
-void free_env(void);
-char **_get_env(const char *var);
+void alias_data(void);
+void cd_data(void);
+void env_data(char *cmd);
+void exit_data(void);
+void help_data(void);
+void history_data(void);
+void setenv_data(void);
+void unsetenv_data(void);
 
-/* Error Handling */
-int create_error(char **args, int err);
-char *error_env(char **args);
-char *error_1(char **args);
-char *error_2_exit(char **args);
-char *error_2_cd(char **args);
-char *error_2_syntax(char **args);
-char *error_126(char **args);
-char *error_127(char **args);
+void whichAlias(char **tokens);
+alias *resetAlias(alias **head, char *key, char *value);
+alias *addAlias(alias **head, char *key, char *value);
+void printAlias(alias **head);
+alias *findAlias(alias **head, char *key);
+alias *find_aliasToalias(alias **head, char *key);
 
-/* Linkedlist Helpers */
-aliases_t *add_alias_end(aliases_t **head, char *name, char *value);
-void free_alias_list(aliases_t *head);
-lists_t *add_node_end(lists_t **head, char *dir);
-void free_list(lists_t *head);
+void chng_dr(char **str);
+void ext(char **str);
+void hlp(char **str);
 
-void help_all(void);
-void help_alias(void);
-void help_cd(void);
-void help_exit(void);
-void help_help(void);
-void help_env(void);
-void help_setenv(void);
-void help_unsetenv(void);
-void help_history(void);
+int checkEnv(char *name);
+char *_getenv(char *name);
+void _setenv(char **str);
+void _unsetenv(char **str);
+void printEnv(char **str);
 
-int proc_file_commands(char *file_path, int *exe_ret);
+hstory *addHistory(hstory **head, char *input, int *nodeCount);
+hstory *popHead(hstory **head, int *nodeCount);
+int readFromFile(char *file, hstory **head, int *nodeCount);
+int writeHstorytofile(char *file);
+void printHistory(char **str);
 
-#endif /* SHELL_H */
+#endif
